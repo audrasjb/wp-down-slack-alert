@@ -1,0 +1,18 @@
+.wpdsa-modal-image {
+	display: block;
+	margin-top: 1em;
+	max-width: 700px;
+	height: auto;
+	border: 10px solid #eee;
+}
+.wpdsa-modal-buttons {
+	overflow: hidden;
+	padding: 0.5em;	
+}
+.image-preview-wrapper {
+	margin-top: 1em;	
+}
+#notification_token {
+	width: 500px;
+	max-width: 100%;
+}
