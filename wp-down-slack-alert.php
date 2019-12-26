@@ -7,7 +7,7 @@
  * Requires PHP: 5.6
  * Author: Whodunit Agency
  * Author URI: https://www.whodunit.fr/
- * Version: 0.3
+ * Version: 0.3.1
  * License: GPLv2
  * License URI: http://www.gnu.org/licenses/gpl-2.0.html
  * Text-domain: wp-down-slack-alert
@@ -19,7 +19,7 @@ defined( 'ABSPATH' ) or die( 'Cheatin&#8217; uh?' );
 function wpdsa_plugin_version() {
 
 	// IMPORTANT: BUMP VERSION NUMBER ON EACH RELEASE
-	$wpdsa_version = '0.3';
+	$wpdsa_version = '0.3.1';
 
 	$wpdsa_current_version = get_option( 'wpdsa_version' );
 	if ( false === $wpdsa_current_version ) {
@@ -41,7 +41,6 @@ function wpdsa_plugin_version() {
 				return;
 			}
 			$filesystem->put_contents( $filename, $contents );
-			echo 'updated file' . $wpdsa_version . '-' . $wpdsa_current_version;
 			update_option( 'wpdsa_version', $wpdsa_version );
 		}
 	}

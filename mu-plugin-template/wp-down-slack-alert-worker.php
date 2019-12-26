@@ -2,7 +2,7 @@
 /**
  * Plugin Name: WP Down Slack Alert - Worker
  * Description: This plugin’s purpose is to manage Slack connexion once WP Down Slack Alert plugin is activated.
- * Version: 0.3
+ * Version: 0.3.1
  * License: GPLv2
  * License URI: http://www.gnu.org/licenses/gpl-2.0.html
  * Text-domain: wp-down-slack-alert
@@ -22,7 +22,10 @@ add_action( 'admin_enqueue_scripts', 'wpdsa_admin_screen_enqueues' );
 add_filter(
 	'recovery_mode_email_rate_limit',
 	function ( $interval ) {
-		$recurrence_mail = esc_html( get_option( 'settings_slack_notification_recurrence_mail' ) );
+		$recurrence_mail = intval( esc_html( get_option( 'settings_slack_notification_recurrence_mail' ) ) );
+		if ( defined( 'WPDSA_NOTIFICATION_RECURRENCE' ) && ! empty( WPDSA_NOTIFICATION_RECURRENCE ) ) {
+			$recurrence_mail = sanitize_text_field( WPDSA_NOTIFICATION_RECURRENCE );
+		}
 		if ( '' !== $recurrence_mail ) {
 			if ( 'anytime' === $recurrence_mail ) {
 				$recurrence_mail = 0;
@@ -160,17 +163,20 @@ function wpdsa_render_settings_callback() {
 	}
 
 	$token = sanitize_text_field( get_option( 'settings_slack_notification_token' ) );
+	if ( defined( 'WPDSA_NOTIFICATION_TOKEN' ) && ! empty( WPDSA_NOTIFICATION_TOKEN ) ) {
+		$token = sanitize_text_field( WPDSA_NOTIFICATION_TOKEN );
+	}
 
 	wp_enqueue_media();
 
-	$recurrence = ( get_option( 'settings_slack_notification_recurrence' ) ) ? get_option( 'settings_slack_notification_recurrence' ) : 1;
+	$recurrence = ( get_option( 'settings_slack_notification_recurrence' ) ) ? floatval( get_option( 'settings_slack_notification_recurrence' ) ) : 1;
 	$notification_recurrence_disabled = '';
 	if ( defined( 'WPDSA_NOTIFICATION_RECURRENCE' ) && ! empty( WPDSA_NOTIFICATION_RECURRENCE ) ) {
-		$recurrence = sanitize_text_field( WPDSA_NOTIFICATION_RECURRENCE );
+		$recurrence = floatval( sanitize_text_field( WPDSA_NOTIFICATION_RECURRENCE ) );
 		$notification_recurrence_disabled = ' disabled';
 	}
 
-	$recurrence_mail = ( get_option( 'settings_slack_notification_recurrence_mail' ) ) ? get_option( 'settings_slack_notification_recurrence_mail' ) : 24;
+	$recurrence_mail = ( get_option( 'settings_slack_notification_recurrence_mail' ) ) ? floatval( get_option( 'settings_slack_notification_recurrence_mail' ) ) : 24;
 
 	$id_image = ( get_option( 'settings_slack_notification_attachment_id' ) ) ? absint( get_option( 'settings_slack_notification_attachment_id' ) ) : '';
 	if ( defined( 'WPDSA_NOTIFICATION_MESSAGE_IMAGE' ) && ! empty( WPDSA_NOTIFICATION_MESSAGE_IMAGE ) ) {
@@ -400,7 +406,7 @@ function wpdsa_render_settings_callback() {
 					</th>
 					<td>
 						<select id="notification_recurrence" name="notification_recurrence" <?php echo $notification_recurrence_disabled; ?>>
-							<option value="0,5" <?php selected( $recurrence, '0,5' ); ?>>
+							<option value="0.5" <?php selected( $recurrence, 0.5 ); ?>>
 								<?php esc_html_e( 'Every 30 minutes', 'wp-down-slack-alert' ); ?>
 							</option>
 							<option value="1" <?php selected( $recurrence, 1 ); ?>>
@@ -696,9 +702,9 @@ function wpdsa_send_slack_notification( $message, $error ) {
 		$message_footer = sanitize_text_field( WPDSA_NOTIFICATION_MESSAGE_FOOTER );
 	}
 
-	$recurrence = sanitize_text_field( get_option( 'settings_slack_notification_recurrence' ) );
+	$recurrence = floatval( sanitize_text_field( get_option( 'settings_slack_notification_recurrence' ) ) );
 	if ( defined( 'WPDSA_NOTIFICATION_RECURRENCE' ) && ! empty( WPDSA_NOTIFICATION_RECURRENCE ) ) {
-		$recurrence = sanitize_text_field( WPDSA_NOTIFICATION_RECURRENCE );
+		$recurrence = floatval( sanitize_text_field( WPDSA_NOTIFICATION_RECURRENCE ) );
 	}
 	$recurrence = ( isset( $recurrence ) && '' !== $recurrence ) ? $recurrence : 1;
 	$recurrence = ( 'anytime' === $recurrence ) ? 0 : $recurrence * 3600; // 3600s -> 1h
@@ -708,6 +714,12 @@ function wpdsa_send_slack_notification( $message, $error ) {
 		$token = sanitize_text_field( WPDSA_NOTIFICATION_TOKEN );
 	}
 
+	$img = wp_get_attachment_url( get_option( 'settings_slack_notification_attachment_id' ) );
+	$icon_url = ( isset( $img ) && '' !== $img ) ? $img : 'http://assets.whodunit.fr/signatures/whodunit.png';
+	if ( defined( 'WPDSA_NOTIFICATION_MESSAGE_IMAGE' ) && ! empty( WPDSA_NOTIFICATION_MESSAGE_IMAGE ) ) {
+		$icon_url = sanitize_text_field( WPDSA_NOTIFICATION_MESSAGE_IMAGE );
+	}
+	
 	$connexion_status = wpdsa_check_slack_connexion( $token );
 
 	if ( true === $connexion_status['connected'] ) {
@@ -721,8 +733,6 @@ function wpdsa_send_slack_notification( $message, $error ) {
 			}
 			$error = $error['message'] . ' ' . esc_html__( 'at line', 'wp-down-slack-alert' ) . ' ' . $error['line'] . "\n";
 			$username = ( isset( $bot_name ) && '' !== $bot_name ) ? $bot_name : 'WP_Recovery_Mode';
-			$img = wp_get_attachment_url( get_option( 'settings_slack_notification_attachment_id' ) );
-			$icon_url = ( isset( $img ) && '' !== $img ) ? $img : 'http://assets.whodunit.fr/signatures/whodunit.png';
 			$disable_email = esc_html( get_option( 'settings_slack_notification_disable_email' ) );
 			if ( defined( 'WPDSA_NOTIFICATION_DISABLE_EMAIL' ) && ! empty( WPDSA_NOTIFICATION_DISABLE_EMAIL ) ) {
 				if ( 1 === intval( WPDSA_NOTIFICATION_DISABLE_EMAIL ) || true === WPDSA_NOTIFICATION_DISABLE_EMAIL || 'true' === WPDSA_NOTIFICATION_DISABLE_EMAIL ) {
