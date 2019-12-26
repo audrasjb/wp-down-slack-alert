@@ -3,7 +3,7 @@ Contributors: whodunitagency, audrasjb, leprincenoir
 Tags: Slack, alert, notification, recovery, recovery mode, downtime, crash, break
 Requires at least: 5.2
 Tested up to: 5.3
-Stable tag: 0.3.1
+Stable tag: 0.3.2
 Requires PHP: 5.6
 License: GPLv2
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
@@ -85,6 +85,9 @@ To programmatically define your settings, you can optionally use the following P
 You can download it, change the constants values if needed and upload it to `/wp-content/mu-plugins` folder. You can also define the PHP constants in your `wp-config.php` file.
 
 == Changelog ==
+
+= 0.3.2 =
+* Fix: false positive with Slack API connexion check.
 
 = 0.3.1 =
 * Fix: possible PHP fatal error on notification frequency.

@@ -2,7 +2,7 @@
 /**
  * Plugin Name: WP Down Slack Alert - Worker
  * Description: This plugin’s purpose is to manage Slack connexion once WP Down Slack Alert plugin is activated.
- * Version: 0.3.1
+ * Version: 0.3.2
  * License: GPLv2
  * License URI: http://www.gnu.org/licenses/gpl-2.0.html
  * Text-domain: wp-down-slack-alert
@@ -663,7 +663,11 @@ function wpdsa_check_slack_connexion( $token ) {
 		error_log( $response->get_error_message() );
 	}
 
-	if ( empty( get_option( 'settings_slack_notification_channel' ) ) ) {
+	$channel = sanitize_text_field( get_option( 'settings_slack_notification_channel' ) );
+	if ( defined( 'WPDSA_NOTIFICATION_CHANNEL' ) && ! empty( WPDSA_NOTIFICATION_CHANNEL ) ) {
+		$channel = sanitize_text_field( WPDSA_NOTIFICATION_CHANNEL );
+	}
+	if ( empty( $channel ) ) {
 		$connexion_status['connected'] = false;
 		$connexion_status['error']     = 'Empty Slack channel';
 	}
