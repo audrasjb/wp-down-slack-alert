@@ -2,7 +2,7 @@
 /**
  * Plugin Name: WP Down Slack Alert - Worker
  * Description: This plugin’s purpose is to manage Slack connexion once WP Down Slack Alert plugin is activated.
- * Version: 0.2
+ * Version: 0.3
  * License: GPLv2
  * License URI: http://www.gnu.org/licenses/gpl-2.0.html
  * Text-domain: wp-down-slack-alert
@@ -10,9 +10,11 @@
 
 function wpdsa_admin_screen_enqueues( $hook ) {
 	if ( 'tools_page_settings-slack-notification' === $hook ) {
+		wp_register_script( 'wp-down-slack-alert-scripts', WP_PLUGIN_URL . '/wp-down-slack-alert/js/wp-down-slack-alert.js', array( 'jquery', 'jquery-ui-core', 'jquery-ui-dialog' ) );
+		wp_register_style( 'wp-down-slack-alert-styles', WP_PLUGIN_URL . '/wp-down-slack-alert/css/wp-down-slack-alert.css', array( 'wp-jquery-ui-dialog' ) );
 		wp_enqueue_script( 'jquery-ui-dialog' );
-		wp_enqueue_script( 'wp-down-slack-alert-scripts', WP_PLUGIN_URL . '/wp-down-slack-alert/js/wp-down-slack-alert.js', array( 'jquery', 'jquery-ui-core', 'jquery-ui-dialog' ) );
-		wp_enqueue_style( 'wp-down-slack-alert-styles', WP_PLUGIN_URL . '/wp-down-slack-alert/css/wp-down-slack-alert.css', 'wp-jquery-ui-dialog' );
+		wp_enqueue_script( 'wp-down-slack-alert-scripts' );
+		wp_enqueue_style( 'wp-down-slack-alert-styles' );
 	}
 }
 add_action( 'admin_enqueue_scripts', 'wpdsa_admin_screen_enqueues' );
@@ -35,14 +37,18 @@ add_filter(
 add_action( 'admin_menu', 'wpdsa_add_sub_menu' );
 
 function wpdsa_add_sub_menu() {
-	add_submenu_page(
-		'tools.php',
-		esc_html__( 'WP Down Slack Alert', 'wp-down-slack-alert' ),
-		esc_html__( 'Slack Alert', 'wp-down-slack-alert' ),
-		'manage_options',
-		'settings-slack-notification',
-		'wpdsa_render_settings_callback'
-	);
+	if ( defined( 'WPDSA_SETTINGS' ) && false === WPDSA_SETTINGS ) {
+		// Don’t create the settings screen if the WPDSA_SETTINGS constant is defined to false.
+	} else {
+		add_submenu_page(
+			'tools.php',
+			esc_html__( 'WP Down Slack Alert', 'wp-down-slack-alert' ),
+			esc_html__( 'Slack Alert', 'wp-down-slack-alert' ),
+			'manage_options',
+			'settings-slack-notification',
+			'wpdsa_render_settings_callback'
+		);
+	}
 }
 
 add_filter(
@@ -79,35 +85,77 @@ function wpdsa_render_settings_callback() {
 	}
 
 	if ( isset( $_POST, $_POST['submit_settings_slack_notification'] ) && ! empty( $_POST ) && wp_verify_nonce( $_POST['nonce'], 'wpdsa_nonce_slack' ) ) {
+
+		// Slack channel
 		if ( isset( $_POST['notification_channel'] ) ) {
 			update_option( 'settings_slack_notification_channel', sanitize_text_field( $_POST['notification_channel'] ) );
 		}
+		if ( defined( 'WPDSA_NOTIFICATION_CHANNEL' ) && ! empty( WPDSA_NOTIFICATION_CHANNEL ) ) {
+			update_option( 'settings_slack_notification_channel', sanitize_text_field( WPDSA_NOTIFICATION_CHANNEL ) );
+		}
+
+		// Bot name
 		if ( isset( $_POST['notification_bot_name'] ) ) {
 			$bot_name = str_replace( ' ', '_', $_POST['notification_bot_name'] );
 			update_option( 'settings_slack_notification_bot_name', sanitize_text_field( $bot_name ) );
 		}
+		if ( defined( 'WPDSA_NOTIFICATION_BOTNAME' ) && ! empty( WPDSA_NOTIFICATION_BOTNAME ) ) {
+			$bot_name = str_replace( ' ', '_', WPDSA_NOTIFICATION_BOTNAME );
+			update_option( 'settings_slack_notification_bot_name', sanitize_text_field( $bot_name ) );
+		}
+
+		// Notification e-mail
 		if ( isset( $_POST['notification_bot_disable_email'] ) ) {
 			update_option( 'settings_slack_notification_disable_email', 1 );
 		} else {
 			update_option( 'settings_slack_notification_disable_email', 0 );
 		}
-		if ( isset( $_POST['notification_recurrence'] ) ) {
-			update_option( 'settings_slack_notification_recurrence', sanitize_text_field( $_POST['notification_recurrence'] ) );
+		if ( defined( 'WPDSA_NOTIFICATION_DISABLE_EMAIL' ) && ! empty( WPDSA_NOTIFICATION_DISABLE_EMAIL ) ) {
+			$email_checked = 0;
+			if ( 1 === intval( WPDSA_NOTIFICATION_DISABLE_EMAIL ) || true === WPDSA_NOTIFICATION_DISABLE_EMAIL || 'true' === WPDSA_NOTIFICATION_DISABLE_EMAIL ) {
+				$email_checked = 1;
+			}
+			update_option( 'settings_slack_notification_disable_email', $email_checked );
 		}
 		if ( isset( $_POST['mail_recurrence'] ) ) {
 			update_option( 'settings_slack_notification_recurrence_mail', sanitize_text_field( $_POST['mail_recurrence'] ) );
 		}
+
+		// Notification recurrence
+		if ( isset( $_POST['notification_recurrence'] ) ) {
+			update_option( 'settings_slack_notification_recurrence', sanitize_text_field( $_POST['notification_recurrence'] ) );
+		}
+		if ( defined( 'WPDSA_NOTIFICATION_RECURRENCE' ) && ! empty( WPDSA_NOTIFICATION_RECURRENCE ) ) {
+			update_option( 'settings_slack_notification_recurrence', sanitize_text_field( WPDSA_NOTIFICATION_RECURRENCE ) );
+		}
+
+		// Bot avatar image
 		if ( isset( $_POST['image_attachment_id'] ) ) {
 			update_option( 'settings_slack_notification_attachment_id', absint( $_POST['image_attachment_id'] ) );
-		}
+		} // PHP constant below
+
+		// Slack API Token
 		if ( isset( $_POST['notification_token'] ) ) {
 			update_option( 'settings_slack_notification_token', sanitize_text_field( $_POST['notification_token'] ) );
 		}
+		if ( defined( 'WPDSA_NOTIFICATION_TOKEN' ) && ! empty( WPDSA_NOTIFICATION_TOKEN ) ) {
+			update_option( 'settings_slack_notification_token', sanitize_text_field( WPDSA_NOTIFICATION_TOKEN ) );
+		}
+
+		// Message title
 		if ( isset( $_POST['notification_message_title'] ) ) {
 			update_option( 'settings_slack_notification_message_title', sanitize_text_field( $_POST['notification_message_title'] ) );
 		}
+		if ( defined( 'WPDSA_NOTIFICATION_MESSAGE_TITLE' ) && ! empty( WPDSA_NOTIFICATION_MESSAGE_TITLE ) ) {
+			update_option( 'settings_slack_notification_message_title', sanitize_text_field( WPDSA_NOTIFICATION_MESSAGE_TITLE ) );
+		}
+
+		// Message footer text
 		if ( isset( $_POST['notification_message_footer'] ) ) {
 			update_option( 'settings_slack_notification_message_footer', sanitize_text_field( $_POST['notification_message_footer'] ) );
+		}
+		if ( defined( 'WPDSA_NOTIFICATION_MESSAGE_FOOTER' ) && ! empty( WPDSA_NOTIFICATION_MESSAGE_FOOTER ) ) {
+			update_option( 'settings_slack_notification_message_footer', sanitize_text_field( WPDSA_NOTIFICATION_MESSAGE_FOOTER ) );
 		}
 	}
 
@@ -116,10 +164,19 @@ function wpdsa_render_settings_callback() {
 	wp_enqueue_media();
 
 	$recurrence = ( get_option( 'settings_slack_notification_recurrence' ) ) ? get_option( 'settings_slack_notification_recurrence' ) : 1;
+	$notification_recurrence_disabled = '';
+	if ( defined( 'WPDSA_NOTIFICATION_RECURRENCE' ) && ! empty( WPDSA_NOTIFICATION_RECURRENCE ) ) {
+		$recurrence = sanitize_text_field( WPDSA_NOTIFICATION_RECURRENCE );
+		$notification_recurrence_disabled = ' disabled';
+	}
 
 	$recurrence_mail = ( get_option( 'settings_slack_notification_recurrence_mail' ) ) ? get_option( 'settings_slack_notification_recurrence_mail' ) : 24;
 
 	$id_image = ( get_option( 'settings_slack_notification_attachment_id' ) ) ? absint( get_option( 'settings_slack_notification_attachment_id' ) ) : '';
+	if ( defined( 'WPDSA_NOTIFICATION_MESSAGE_IMAGE' ) && ! empty( WPDSA_NOTIFICATION_MESSAGE_IMAGE ) ) {
+		$id_image = sanitize_text_field( WPDSA_NOTIFICATION_MESSAGE_IMAGE );
+		update_option( 'settings_slack_notification_attachment_id', $id_image );
+	}
 	?>
 	<div class="wrap">
 		<h1><?php esc_html_e( 'WP Down Slack Alert', 'wp-down-slack-alert' ); ?></h1>
@@ -168,6 +225,18 @@ function wpdsa_render_settings_callback() {
 						<label for="notification_token"><?php esc_html_e( 'Slack App token', 'wp-down-slack-alert' ); ?></label>
 					</th>
 					<td>
+					<?php if ( defined( 'WPDSA_NOTIFICATION_TOKEN' ) && ! empty( WPDSA_NOTIFICATION_TOKEN ) ) : ?>
+						<input id="notification_token" name='notification_token' type="text" value="<?php echo esc_html( WPDSA_NOTIFICATION_TOKEN ); ?>" disabled />
+						<p class="description">
+							<?php
+							echo sprintf(
+								/* translators: %s: Name of the constant */
+								__( 'This setting is disabled as it’s already defined with the constant %s', 'wp-down-slack-alert' ),
+								'<code>WPDSA_NOTIFICATION_TOKEN</code>'
+							);
+							?>
+						</p>
+					<?php else : ?>
 						<input id="notification_token" name='notification_token' type="text" value="<?php echo esc_html( $token ); ?>"/>
 						<?php if ( 'notice-success' !== $notice_classes ) : ?>
 						<p>
@@ -261,7 +330,7 @@ function wpdsa_render_settings_callback() {
 							</p>
 							<img class="wpdsa-modal-image" src="<?php echo WP_PLUGIN_URL; ?>/wp-down-slack-alert/images/config-7.png" alt="" />
 						</div>
-
+					<?php endif; ?>
 					</td>
 				</tr>
 			</table>
@@ -273,8 +342,27 @@ function wpdsa_render_settings_callback() {
 						<label for="notification_bot_disable_email"><?php esc_html_e( 'Disable administrator email notification', 'wp-down-slack-alert' ); ?></label>
 					</th>
 					<td>
+					<?php if ( defined( 'WPDSA_NOTIFICATION_DISABLE_EMAIL' ) && ! empty( WPDSA_NOTIFICATION_DISABLE_EMAIL ) ) : ?>
+						<?php
+						$email_checked = 0;
+						if ( 1 === WPDSA_NOTIFICATION_DISABLE_EMAIL || true === WPDSA_NOTIFICATION_DISABLE_EMAIL || 'true' === WPDSA_NOTIFICATION_DISABLE_EMAIL ) {
+							$email_checked = 'checked';
+						}
+						?>
+						<input <?php echo esc_attr( $email_checked ); ?> id="notification_bot_disable_email" name='notification_bot_disable_email' type="checkbox" value="Off" disabled />
+						<span class="description"><?php esc_html_e( 'If checked, this will prevent sending recovery notification emails to website admin.', 'wp-down-slack-alert' ); ?></span>
+						<p class="description">
+							<?php
+							echo sprintf(
+								/* translators: %s: Name of the constant */
+								__( 'This setting is disabled as it’s already defined with the constant %s', 'wp-down-slack-alert' ),
+								'<code>WPDSA_NOTIFICATION_DISABLE_EMAIL</code>'
+							);
+							?>
+						</p>
+					<?php else : ?>
 						<?php $email_checked = 1 === get_option( 'settings_slack_notification_disable_email' ) ? 'checked' : ''; ?>
-						<input <?php echo esc_attr( $email_checked ); ?> id="notification_bot_disable_email" name='notification_bot_disable_email' type="checkbox" value="Off"/>
+						<input <?php echo esc_attr( $email_checked ); ?> id="notification_bot_disable_email" name='notification_bot_disable_email' type="checkbox" value="Off" />
 						<span class="description"><?php esc_html_e( 'If checked, this will prevent sending recovery notification emails to website admin.', 'wp-down-slack-alert' ); ?></span>
 
 						<?php $email_frequency_visibility = ! empty( $email_checked ) ? ' class="rtms_visually_hidden"' : ''; ?>
@@ -303,6 +391,7 @@ function wpdsa_render_settings_callback() {
 								<span class="description"><?php esc_html_e( 'By default an email is sent once a day to notify the site administrator.', 'wp-down-slack-alert' ); ?></span>
 							</p>
 						</div>
+					<?php endif; ?>
 					</td>
 				</tr>
 				<tr>
@@ -310,7 +399,7 @@ function wpdsa_render_settings_callback() {
 						<label for="notification_recurrence"><?php esc_html_e( 'Slack notifications frequency', 'wp-down-slack-alert' ); ?></label>
 					</th>
 					<td>
-						<select id="notification_recurrence" name="notification_recurrence">
+						<select id="notification_recurrence" name="notification_recurrence" <?php echo $notification_recurrence_disabled; ?>>
 							<option value="0,5" <?php selected( $recurrence, '0,5' ); ?>>
 								<?php esc_html_e( 'Every 30 minutes', 'wp-down-slack-alert' ); ?>
 							</option>
@@ -330,6 +419,17 @@ function wpdsa_render_settings_callback() {
 								<?php esc_html_e( 'Each time an error is triggered – not recommended (Slack flooding)', 'wp-down-slack-alert' ); ?>
 							</option>
 						</select>
+					<?php if ( defined( 'WPDSA_NOTIFICATION_RECURRENCE' ) && ! empty( WPDSA_NOTIFICATION_RECURRENCE ) ) : ?>
+						<p class="description">
+							<?php
+							echo sprintf(
+								/* translators: %s: Name of the constant */
+								__( 'This setting is disabled as it’s already defined with the constant %s', 'wp-down-slack-alert' ),
+								'<code>WPDSA_NOTIFICATION_RECURRENCE</code>'
+							);
+							?>
+						</p>
+					<?php endif; ?>
 					</td>
 				</tr>
 				<tr>
@@ -339,8 +439,22 @@ function wpdsa_render_settings_callback() {
 					<td>
 						<div style="position:relative;">
 							<span style="position:absolute;left:1em;top:8px;color:#aaa;">#</span>
-							<input class="regular-text" id="notification_channel" name='notification_channel' type="text" value="<?php echo esc_html( get_option( 'settings_slack_notification_channel' ) ); ?>" style="padding-left:2em;"/>
+						<?php if ( defined( 'WPDSA_NOTIFICATION_CHANNEL' ) && ! empty( WPDSA_NOTIFICATION_CHANNEL ) ) : ?>
+							<input class="regular-text" id="notification_channel" name='notification_channel' type="text" value="<?php echo esc_html( trim( WPDSA_NOTIFICATION_CHANNEL ) ); ?>" style="padding-left:2em;" disabled />
 							<span class="description"><?php esc_html_e( 'The channel where you want to be notified.', 'wp-down-slack-alert' ); ?></span>
+							<p class="description">
+								<?php
+								echo sprintf(
+									/* translators: %s: Name of the constant */
+									__( 'This setting is disabled as it’s already defined with the constant %s', 'wp-down-slack-alert' ),
+									'<code>WPDSA_NOTIFICATION_CHANNEL</code>'
+								);
+								?>
+							</p>
+						<?php else : ?>
+							<input class="regular-text" id="notification_channel" name="notification_channel" type="text" value="<?php echo esc_html( get_option( 'settings_slack_notification_channel' ) ); ?>" style="padding-left:2em;" />
+							<span class="description"><?php esc_html_e( 'The channel where you want to be notified.', 'wp-down-slack-alert' ); ?></span>
+						<?php endif; ?>
 						</div>
 					</td>
 				</tr>
@@ -349,7 +463,20 @@ function wpdsa_render_settings_callback() {
 						<label for="notification_bot_name"><?php esc_html_e( 'Bot Name', 'wp-down-slack-alert' ); ?></label>
 					</th>
 					<td>
-						<input class="regular-text" id="notification_bot_name" name='notification_bot_name' type="text" value="<?php echo esc_html( get_option( 'settings_slack_notification_bot_name' ) ); ?>"/>
+					<?php if ( defined( 'WPDSA_NOTIFICATION_BOTNAME' ) && ! empty( WPDSA_NOTIFICATION_BOTNAME ) ) : ?>
+						<input class="regular-text" id="notification_bot_name" name="notification_bot_name" type="text" value="<?php echo esc_html( WPDSA_NOTIFICATION_BOTNAME ); ?>" disabled />
+						<p class="description">
+							<?php
+							echo sprintf(
+								/* translators: %s: Name of the constant */
+								__( 'This setting is disabled as it’s already defined with the constant %s', 'wp-down-slack-alert' ),
+								'<code>WPDSA_NOTIFICATION_BOTNAME</code>'
+							);
+							?>
+						</p>
+					<?php else : ?>
+						<input class="regular-text" id="notification_bot_name" name="notification_bot_name" type="text" value="<?php echo esc_html( get_option( 'settings_slack_notification_bot_name' ) ); ?>" />
+					<?php endif; ?>
 					</td>
 				</tr>
 				<tr>
@@ -358,16 +485,28 @@ function wpdsa_render_settings_callback() {
 
 					</th>
 					<td>
+					<?php if ( defined( 'WPDSA_NOTIFICATION_MESSAGE_IMAGE' ) && ! empty( WPDSA_NOTIFICATION_MESSAGE_IMAGE ) ) : ?>
+						<?php $image_src = $id_image; ?>
+						<p class="description">
+							<?php
+							echo sprintf(
+								/* translators: %s: Name of the constant */
+								__( 'This setting is disabled as it’s already defined with the constant %s', 'wp-down-slack-alert' ),
+								'<code>WPDSA_NOTIFICATION_MESSAGE_IMAGE</code>'
+							);
+							?>
+						</p>
+					<?php else : ?>
 						<input id="upload_image_button" type="button" class="button" value="<?php esc_html_e( 'Upload image', 'wp-down-slack-alert' ); ?>"/>
 						<input type="hidden" name="image_attachment_id" id="image_attachment_id" value="<?php echo (int) $id_image; ?>">
-
+						<?php
+						$image_src = 'http://assets.whodunit.fr/signatures/whodunit.png';
+						if ( '' !== $id_image && wp_get_attachment_url( $id_image ) ) {
+							$image_src = wp_get_attachment_url( $id_image );
+						}
+						?>
+					<?php endif; ?>
 						<div class="image-preview-wrapper">
-							<?php
-							$image_src = 'http://assets.whodunit.fr/signatures/whodunit.png';
-							if ( '' !== $id_image && wp_get_attachment_url( $id_image ) ) {
-								$image_src = wp_get_attachment_url( $id_image );
-							}
-							?>
 							<img id="image-preview" src="<?php echo esc_url( $image_src ); ?>" style="height:100px;">
 						</div>
 					</td>
@@ -381,13 +520,26 @@ function wpdsa_render_settings_callback() {
 						<label for="notification_message_title"><?php esc_html_e( 'Alert title', 'wp-down-slack-alert' ); ?></label>
 					</th>
 					<td>
+					<?php if ( defined( 'WPDSA_NOTIFICATION_MESSAGE_TITLE' ) && ! empty( WPDSA_NOTIFICATION_MESSAGE_TITLE ) ) : ?>
+						<input type="text" id="notification_message_title" name="notification_message_title" class="regular-text" value="<?php echo sanitize_text_field( WPDSA_NOTIFICATION_MESSAGE_TITLE ); ?>" disabled />
+						<p class="description">
+							<?php
+							echo sprintf(
+								/* translators: %s: Name of the constant */
+								__( 'This setting is disabled as it’s already defined with the constant %s', 'wp-down-slack-alert' ),
+								'<code>WPDSA_NOTIFICATION_MESSAGE_TITLE</code>'
+							);
+							?>
+						</p>
+					<?php else : ?>
 						<?php
 						$notification_message_title = esc_html__( 'Warning: website out of order', 'wp-down-slack-alert' );
 						if ( get_option( 'settings_slack_notification_message_title' ) ) {
 							$notification_message_title = esc_attr( get_option( 'settings_slack_notification_message_title' ) );
 						}
 						?>
-						<input type="text" id="notification_message_title" name="notification_message_title" class="regular-text" value="<?php echo $notification_message_title; ?>"/>
+						<input type="text" id="notification_message_title" name="notification_message_title" class="regular-text" value="<?php echo $notification_message_title; ?>" />
+					<?php endif; ?>
 					</td>
 				</tr>
 				<tr>
@@ -395,13 +547,26 @@ function wpdsa_render_settings_callback() {
 						<label for="notification_message_footer"><?php esc_html_e( 'Notification footer text', 'wp-down-slack-alert' ); ?></label>
 					</th>
 					<td>
+					<?php if ( defined( 'WPDSA_NOTIFICATION_MESSAGE_FOOTER' ) && ! empty( WPDSA_NOTIFICATION_MESSAGE_FOOTER ) ) : ?>
+						<input type="text" id="notification_message_footer" name="notification_message_footer" class="regular-text" value="<?php echo sanitize_text_field( WPDSA_NOTIFICATION_MESSAGE_FOOTER ); ?>" disabled />
+						<p class="description">
+							<?php
+							echo sprintf(
+								/* translators: %s: Name of the constant */
+								__( 'This setting is disabled as it’s already defined with the constant %s', 'wp-down-slack-alert' ),
+								'<code>WPDSA_NOTIFICATION_MESSAGE_FOOTER</code>'
+							);
+							?>
+						</p>
+					<?php else : ?>
 						<?php
 						$notification_message_footer = esc_html__( 'WP Down Slack Alert, by Whodunit', 'wp-down-slack-alert' );
 						if ( get_option( 'settings_slack_notification_message_footer' ) ) {
 							$notification_message_footer = esc_attr( get_option( 'settings_slack_notification_message_footer' ) );
 						}
 						?>
-						<input type="text" id="notification_message_footer" name="notification_message_footer" class="regular-text" value="<?php echo $notification_message_footer; ?>"/>
+						<input type="text" id="notification_message_footer" name="notification_message_footer" class="regular-text" value="<?php echo $notification_message_footer; ?>" />
+					<?php endif; ?>
 					</td>
 				</tr>
 			</table>
@@ -475,8 +640,15 @@ function wpdsa_check_slack_connexion( $token ) {
 			$body                = wp_remote_retrieve_body( $response );
 			$is_connected_object = json_decode( $body );
 
-			$connexion_status['team']      = $is_connected_object->team ?? false;
-			$connexion_status['error']     = $is_connected_object->error ?? false;
+			$connexion_status['team'] = false;
+			if( isset( $is_connected_object->team ) ) {
+			    $connexion_status['team'] = $is_connected_object->team;
+            }
+
+			$connexion_status['error'] = false;
+            if( isset( $is_connected_object->error ) ) {
+                $connexion_status['error'] = $is_connected_object->error;
+            }
 			$connexion_status['connected'] = $is_connected_object->ok;
 		} else {
 			error_log( wp_remote_retrieve_response_message( $response ) );
@@ -498,23 +670,43 @@ function wpdsa_send_slack_notification( $message, $error ) {
 	$new_value = time();
 
 	$option_name = 'who_recovery_mode_time';
-	$data        = get_option( $option_name );
+	$data = get_option( $option_name );
 
-	$channel               = get_option( 'settings_slack_notification_channel' );
-	$bot_name              = get_option( 'settings_slack_notification_bot_name' );
-	$message_title_custom  = sanitize_text_field( get_option( 'notification_message_title' ) );
+	$channel = sanitize_text_field( get_option( 'settings_slack_notification_channel' ) );
+	if ( defined( 'WPDSA_NOTIFICATION_CHANNEL' ) && ! empty( WPDSA_NOTIFICATION_CHANNEL ) ) {
+		$channel = sanitize_text_field( WPDSA_NOTIFICATION_CHANNEL );
+	}
+
+	$bot_name = sanitize_text_field( get_option( 'settings_slack_notification_bot_name' ) );
+	if ( defined( 'WPDSA_NOTIFICATION_BOTNAME' ) && ! empty( WPDSA_NOTIFICATION_BOTNAME ) ) {
+		$bot_name = sanitize_text_field( WPDSA_NOTIFICATION_BOTNAME );
+	}
+
+	$message_title_custom = sanitize_text_field( get_option( 'notification_message_title' ) );
 	$message_title_default = esc_html__( 'Warning: website out of order', 'wp-down-slack-alert' );
-	$message_title         = ! empty( $message_title_custom ) ? $message_title_custom : $message_title_default;
+	$message_title = ! empty( $message_title_custom ) ? $message_title_custom : $message_title_default;
+	if ( defined( 'WPDSA_NOTIFICATION_MESSAGE_TITLE' ) && ! empty( WPDSA_NOTIFICATION_MESSAGE_TITLE ) ) {
+		$message_title = sanitize_text_field( WPDSA_NOTIFICATION_MESSAGE_TITLE );
+	}
 
-	$message_footer_custom  = sanitize_text_field( get_option( 'notification_message_footer' ) );
+	$message_footer_custom = sanitize_text_field( get_option( 'notification_message_footer' ) );
 	$message_footer_default = esc_html__( 'WP Down Slack Alert, by Whodunit', 'wp-down-slack-alert' );
-	$message_footer         = ! empty( $message_footer_custom ) ? $message_footer_custom : $message_footer_default;
+	$message_footer = ! empty( $message_footer_custom ) ? $message_footer_custom : $message_footer_default;
+	if ( defined( 'WPDSA_NOTIFICATION_MESSAGE_FOOTER' ) && ! empty( WPDSA_NOTIFICATION_MESSAGE_FOOTER ) ) {
+		$message_footer = sanitize_text_field( WPDSA_NOTIFICATION_MESSAGE_FOOTER );
+	}
 
-	$recurrence = get_option( 'settings_slack_notification_recurrence' );
+	$recurrence = sanitize_text_field( get_option( 'settings_slack_notification_recurrence' ) );
+	if ( defined( 'WPDSA_NOTIFICATION_RECURRENCE' ) && ! empty( WPDSA_NOTIFICATION_RECURRENCE ) ) {
+		$recurrence = sanitize_text_field( WPDSA_NOTIFICATION_RECURRENCE );
+	}
 	$recurrence = ( isset( $recurrence ) && '' !== $recurrence ) ? $recurrence : 1;
 	$recurrence = ( 'anytime' === $recurrence ) ? 0 : $recurrence * 3600; // 3600s -> 1h
 
-	$token = get_option( 'settings_slack_notification_token' );
+	$token = sanitize_text_field( get_option( 'settings_slack_notification_token' ) );
+	if ( defined( 'WPDSA_NOTIFICATION_TOKEN' ) && ! empty( WPDSA_NOTIFICATION_TOKEN ) ) {
+		$token = sanitize_text_field( WPDSA_NOTIFICATION_TOKEN );
+	}
 
 	$connexion_status = wpdsa_check_slack_connexion( $token );
 
@@ -527,16 +719,26 @@ function wpdsa_send_slack_notification( $message, $error ) {
 			} else {
 				$email = esc_html__( 'Admin email:', 'wp-down-slack-alert' ) . ' ' . get_bloginfo( 'admin_email' ) . "\n";
 			}
-			$error         = $error['message'] . ' ' . esc_html__( 'at line', 'wp-down-slack-alert' ) . ' ' . $error['line'] . "\n";
-			$username      = ( isset( $bot_name ) && '' !== $bot_name ) ? $bot_name : 'WP_Recovery_Mode';
-			$img           = wp_get_attachment_url( get_option( 'settings_slack_notification_attachment_id' ) );
-			$icon_url      = ( isset( $img ) && '' !== $img ) ? $img : 'http://assets.whodunit.fr/signatures/whodunit.png';
+			$error = $error['message'] . ' ' . esc_html__( 'at line', 'wp-down-slack-alert' ) . ' ' . $error['line'] . "\n";
+			$username = ( isset( $bot_name ) && '' !== $bot_name ) ? $bot_name : 'WP_Recovery_Mode';
+			$img = wp_get_attachment_url( get_option( 'settings_slack_notification_attachment_id' ) );
+			$icon_url = ( isset( $img ) && '' !== $img ) ? $img : 'http://assets.whodunit.fr/signatures/whodunit.png';
 			$disable_email = esc_html( get_option( 'settings_slack_notification_disable_email' ) );
-			$email_sent    = esc_html__( 'An email was sent to the website admin.', 'wp-down-slack-alert' );
+			if ( defined( 'WPDSA_NOTIFICATION_DISABLE_EMAIL' ) && ! empty( WPDSA_NOTIFICATION_DISABLE_EMAIL ) ) {
+				if ( 1 === intval( WPDSA_NOTIFICATION_DISABLE_EMAIL ) || true === WPDSA_NOTIFICATION_DISABLE_EMAIL || 'true' === WPDSA_NOTIFICATION_DISABLE_EMAIL ) {
+					$disable_email = 1;
+				} else {
+					$disable_email = 0;
+				}
+			}
+			$email_sent = esc_html__( 'An email was sent to the website admin.', 'wp-down-slack-alert' );
 			if ( isset( $disable_email ) && 1 === $disable_email ) {
 				$email_sent = esc_html__( 'No email was sent to the website admin.', 'wp-down-slack-alert' );
 			}
 			$pretext = sanitize_text_field( get_option( 'settings_slack_notification_message_title' ) );
+			if ( defined( 'WPDSA_NOTIFICATION_MESSAGE_TITLE' ) && ! empty( WPDSA_NOTIFICATION_MESSAGE_TITLE ) ) {
+				$pretext = sanitize_text_field( WPDSA_NOTIFICATION_MESSAGE_TITLE );
+			}
 			$pretext = ( isset( $pretext ) && ! empty( $pretext ) ) ? $pretext : esc_html__( 'Broken Website Notification', 'wp-down-slack-alert' );
 
 			$attachments = array(
@@ -610,5 +812,4 @@ function wpdsa_add_settings_link( $links, $file ) {
 
 	return $links;
 }
-
 add_filter( 'plugin_action_links', 'wpdsa_add_settings_link', 10, 2 );
