@@ -2,7 +2,7 @@
 /**
  * Plugin Name: WP Down Slack Alert - Worker
  * Description: This plugin’s purpose is to manage Slack connexion once WP Down Slack Alert plugin is activated.
- * Version: 0.3.2
+ * Version: 0.4
  * License: GPLv2
  * License URI: http://www.gnu.org/licenses/gpl-2.0.html
  * Text-domain: wp-down-slack-alert
@@ -160,6 +160,24 @@ function wpdsa_render_settings_callback() {
 		if ( defined( 'WPDSA_NOTIFICATION_MESSAGE_FOOTER' ) && ! empty( WPDSA_NOTIFICATION_MESSAGE_FOOTER ) ) {
 			update_option( 'settings_slack_notification_message_footer', sanitize_text_field( WPDSA_NOTIFICATION_MESSAGE_FOOTER ) );
 		}
+
+		// Green notifications
+		$disable_green_notification = 0;
+		if ( isset( $_POST['notification_disable_green'] ) ) {
+			update_option( 'settings_slack_notification_green_disable', 1 );
+			$disable_green_notification = 1;
+		} else {
+			update_option( 'settings_slack_notification_green_disable', 0 );
+			$disable_green_notification = 0;
+		}
+		if ( defined( 'WPDSA_NOTIFICATION_DISABLE_GREEN' ) && ! empty( WPDSA_NOTIFICATION_DISABLE_GREEN ) ) {
+			$disable_green_notification = 0;
+			if ( 1 === intval( WPDSA_NOTIFICATION_DISABLE_GREEN ) || true === WPDSA_NOTIFICATION_DISABLE_GREEN || 'true' === WPDSA_NOTIFICATION_DISABLE_GREEN ) {
+				$disable_green_notification = 1;
+			}
+			update_option( 'settings_slack_notification_green_disable', $disable_green_notification );
+		}
+
 	}
 
 	$token = sanitize_text_field( get_option( 'settings_slack_notification_token' ) );
@@ -576,6 +594,51 @@ function wpdsa_render_settings_callback() {
 					</td>
 				</tr>
 			</table>
+
+			<h2><?php esc_html_e( 'Green notifications', 'wp-down-slack-alert' ); ?></h2>
+			<p class="description"><?php esc_html_e( 'Green notifications are sent when a broken website is back in business.', 'wp-down-slack-alert' ); ?></p>
+			<table class="form-table">
+				<tr>
+					<th>
+						<label for="notification_disable_green"><?php esc_html_e( 'Disable green notifications', 'wp-down-slack-alert' ); ?></label>
+					</th>
+					<td>
+					<?php if ( defined( 'WPDSA_NOTIFICATION_DISABLE_GREEN' ) && ! empty( WPDSA_NOTIFICATION_DISABLE_GREEN ) ) : ?>
+						<?php
+						$disable_green_notification = 0;
+						$checked_green = '';
+						if ( 1 === intval( WPDSA_NOTIFICATION_DISABLE_GREEN ) || true === WPDSA_NOTIFICATION_DISABLE_GREEN || 'true' === WPDSA_NOTIFICATION_DISABLE_GREEN ) {
+							$disable_green_notification = 1;
+							$checked_green = ' checked ';
+						}
+						?>
+						<input type="checkbox" id="notification_disable_green" name="notification_disable_green" value="1" <?php echo $checked_green; ?> disabled />
+						<p class="description">
+							<?php
+							echo sprintf(
+								/* translators: %s: Name of the constant */
+								__( 'This setting is disabled as it’s already defined with the constant %s', 'wp-down-slack-alert' ),
+								'<code>WPDSA_NOTIFICATION_DISABLE_GREEN</code>'
+							);
+							?>
+						</p>
+					<?php else : ?>
+						<?php
+						$disable_green_notification = 0;
+						$checked_green = '';
+						if ( get_option( 'settings_slack_notification_green_disable' ) ) {
+							$disable_green_notification = intval( get_option( 'settings_slack_notification_green_disable' ) );
+							if ( 1 === $disable_green_notification ) {
+								$checked_green = ' checked ';
+							}
+						}
+						?>
+						<input type="checkbox" id="notification_disable_green" name="notification_disable_green" value="1" <?php echo $checked_green; ?> />
+					<?php endif; ?>
+					</td>
+				</tr>
+			</table>
+
 			<p class="submit">
 				<input type="submit" name="submit_settings_slack_notification" value="<?php esc_html_e( 'Save changes', 'wp-down-slack-alert' ); ?>" class="button-primary">
 			</p>
@@ -805,11 +868,121 @@ function wpdsa_send_slack_notification( $message, $error ) {
 			} else {
 				error_log( $response->get_error_message() );
 			}
+			
+			// Update status option
+			$array_status = array(
+				'type' => 'error',
+				'time' => time(),
+			);
+			update_option( 'settings_slack_notification_status', $array_status );
+			
 		}
 	}
 
 	return $message;
 }
+
+/*
+ * Generates a Green notification if the website was down and is now ok
+ */
+function wpsda_notification_status_green() {
+	$disable_green_notification = false;
+	if ( ! empty( get_option( 'settings_slack_notification_green_disable' ) ) ) {
+		if ( 1 === intval( get_option( 'settings_slack_notification_green_disable' ) ) ) {
+			$disable_green_notification = true;
+		}	
+	}
+	if ( defined( 'WPDSA_NOTIFICATION_DISABLE_GREEN' ) && ! empty( WPDSA_NOTIFICATION_DISABLE_GREEN ) ) {
+		if ( 1 === intval( WPDSA_NOTIFICATION_DISABLE_GREEN ) || true === WPDSA_NOTIFICATION_DISABLE_GREEN || 'true' === WPDSA_NOTIFICATION_DISABLE_GREEN ) {
+			$disable_green_notification = true;
+		}
+	}
+	if ( ! wp_is_recovery_mode() ) {
+		$array_status = get_option( 'settings_slack_notification_status', array() );
+		if ( ! empty( $array_status ) ) {
+			$token = sanitize_text_field( get_option( 'settings_slack_notification_token' ) );
+			if ( defined( 'WPDSA_NOTIFICATION_TOKEN' ) && ! empty( WPDSA_NOTIFICATION_TOKEN ) ) {
+				$token = sanitize_text_field( WPDSA_NOTIFICATION_TOKEN );
+			}
+			$connexion_status = wpdsa_check_slack_connexion( $token );
+
+			if ( true === $connexion_status['connected'] ) {
+
+				$url = esc_html__( 'Site URL:', 'wp-down-slack-alert' ) . ' ' . get_bloginfo( 'url' ) . "\n";
+						
+				$pretext = esc_html__( 'Good news: this website was down and now it‘s up again!', 'wp-down-slack-alert' );
+
+				$channel = sanitize_text_field( get_option( 'settings_slack_notification_channel' ) );
+				if ( defined( 'WPDSA_NOTIFICATION_CHANNEL' ) && ! empty( WPDSA_NOTIFICATION_CHANNEL ) ) {
+					$channel = sanitize_text_field( WPDSA_NOTIFICATION_CHANNEL );
+				}
+			
+				$bot_name = sanitize_text_field( get_option( 'settings_slack_notification_bot_name' ) );
+				if ( defined( 'WPDSA_NOTIFICATION_BOTNAME' ) && ! empty( WPDSA_NOTIFICATION_BOTNAME ) ) {
+					$bot_name = sanitize_text_field( WPDSA_NOTIFICATION_BOTNAME );
+				}
+
+				$username = ( isset( $bot_name ) && '' !== $bot_name ) ? $bot_name : 'WP_Recovery_Mode';
+
+				$img = wp_get_attachment_url( get_option( 'settings_slack_notification_attachment_id' ) );
+				$icon_url = ( isset( $img ) && '' !== $img ) ? $img : 'http://assets.whodunit.fr/signatures/whodunit.png';
+				if ( defined( 'WPDSA_NOTIFICATION_MESSAGE_IMAGE' ) && ! empty( WPDSA_NOTIFICATION_MESSAGE_IMAGE ) ) {
+					$icon_url = sanitize_text_field( WPDSA_NOTIFICATION_MESSAGE_IMAGE );
+				}
+
+				$message_footer_custom = sanitize_text_field( get_option( 'notification_message_footer' ) );
+				$message_footer_default = esc_html__( 'WP Down Slack Alert, by Whodunit', 'wp-down-slack-alert' );
+				$message_footer = ! empty( $message_footer_custom ) ? $message_footer_custom : $message_footer_default;
+				if ( defined( 'WPDSA_NOTIFICATION_MESSAGE_FOOTER' ) && ! empty( WPDSA_NOTIFICATION_MESSAGE_FOOTER ) ) {
+					$message_footer = sanitize_text_field( WPDSA_NOTIFICATION_MESSAGE_FOOTER );
+				}
+
+				$attachments = array(
+					array(
+						'fallback'    => esc_html__( 'Uptime notification', 'wp-down-slack-alert' ),
+						'pretext'     => $pretext,
+						'title'       => esc_html__( 'Site name:', 'wp-down-slack-alert' ) . ' ' . get_bloginfo( 'name' ),
+						'text'        => $url,
+						'color'       => '3C3',
+						'footer'      => $message_footer,
+						'footer_icon' => 'https://whodunit.fr/logo-slack.png',
+					),
+				);
+
+				$body = array(
+					'channel'     => $channel,
+					'username'    => $username,
+					'attachments' => wp_json_encode( $attachments ),
+					'icon_url'    => $icon_url,
+				);
+				$body = wp_json_encode( $body );
+	
+				$response = wp_remote_post(
+					'https://slack.com/api/chat.postMessage',
+					array(
+						'headers' => array(
+							'Authorization' => 'Bearer ' . $token,
+							'Content-Type'  => 'application/json; charset=utf-8',
+						),
+						'body' => $body,
+					)
+				);
+	
+				if ( ! is_wp_error( $response ) ) {
+					if ( 200 !== wp_remote_retrieve_response_code( $response ) ) {
+						error_log( wp_remote_retrieve_response_message( $response ) );
+					}
+				} else {
+					error_log( $response->get_error_message() );
+				}
+
+				// Update option as it's all green
+				update_option( 'settings_slack_notification_status', array() );
+			}
+		}
+	}
+}
+add_action( 'wp_footer', 'wpsda_notification_status_green' );
 
 /**
  * Add a link to the settings on the Plugins screen.
